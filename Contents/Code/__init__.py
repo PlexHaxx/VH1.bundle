@@ -38,7 +38,7 @@ def Start():
   VideoClipObject.thumb = R(ICON)
   VideoClipObject.art = R(ART)
 
-  #HTTP.CacheTime = CACHE_1HOUR 
+  HTTP.CacheTime = CACHE_1HOUR 
  
 #####################################################################################
 @handler(PREFIX, TITLE, art=ART, thumb=ICON)
