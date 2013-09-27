@@ -1,6 +1,6 @@
-# NEED TO SEE IF WE CAN COMBINE ALL SHOWS AND POPULAR SHOWS
-# at least tough love is not separating full episodes and clips
-# LOOK AT CHANGING SPECIAL SECTION TO ADD VID ID 
+# VIDEO PLAYLIST IN THE TABLE LIST ARE IN THE FORM OF '/video/play.jhtml?id=' AND IN THE MARQUEES ON THE END AS #id= 
+# VIDEO CAROUSELS THE SHOWS SECTION ARE VIDEO PLAYLIST AND OF TYPE '/video/play.jhtml?id=' EXCEPT SNEEK PEEKS
+# SEARCHES AND ALL THAT GO THROU VIDEO PAGE DO NOT HAVE PLAYLIST
 TITLE = 'VH1'
 PREFIX = '/video/vh1'
 ART = 'art-default.jpg'
@@ -304,7 +304,6 @@ def ShowSections(title, thumb, url, season, new):
     oc.add(DirectoryObject(key=Callback(ShowVideos, title='All Videos', section_id='', url=local_url, season=season), title='All Videos', thumb=thumb))
   else:
     # If not watch video, then say nothing is available
-    #oc.add(DirectoryObject(key=Callback(ShowVideos, title='All Videos', section_id='', url=local_url, season=season), title='All Videos', thumb=thumb))
     pass
 
   if len(oc) < 1:
@@ -357,8 +356,9 @@ def ShowVideos(title, section_id, url, season):
 
     # Since video clip playlist are of varying size and impossible to determine parts in URL service, have to do so in code
     # Many of VH1 show clips are playlist with many videos, so check for it and produce full list of those clips here
-    if '#id=' in vid_url:
-      vid_id = vid_url.split('#id=')[1]
+    # MULTIPART SHOW CLIPS FOUND HERE ARE IN THE FORMAT OF '/video/play.jhtml?id=' 
+    if '?id=' in vid_url:
+      vid_id = vid_url.split('?id=')[1]
       vid_url = PLAYLIST %vid_id
       # send to videopage function
       oc.add(DirectoryObject(key=Callback(VideoPage, title=title, url=vid_url), title=title, thumb=thumb))
@@ -537,7 +537,6 @@ def GetThumb(url):
     thumb = page.xpath('//ol[contains(@class, "photo-alt")]/li/div/a/img//@src')[0].split('?')[0]
   except:
     try:
-      #thumb = page.xpath("//head//meta[@property='og:image']//@content")[0].split('?')[0]
       thumb = page.xpath("//head//meta[@name='thumbnail']//@content")[0]
     except:
       thumb = None
@@ -549,7 +548,8 @@ def GetThumb(url):
     return Redirect(R(ICON))
 #########################################################################################
 # This will produce the carousels for vh1 video page the choices for videos are episodes, shows, music and news
-# Teh music section has a different setup and since this is for shows, not using it
+# The music section has a different setup and since this is for shows, not using it
+# ONLY THE SHOWS SECTION HAS VIDEOPLAYLIST AND IT IS ONLY ONES WITHOUT "Sneak" in the title
 # THE MAIN SHOW PAGE CAROUSELS HAVE A COMPLETELY DIFFERENT SETUP, MOSTLY INCLUDE BLOGS, AND ARE AVAILABLE ELSEWHERE THEREFORE THEY WILL NOT BE USED
 @route(PREFIX + '/videocarousel')
 def VideoCarousel(title, vid_type):
@@ -566,12 +566,21 @@ def VideoCarousel(title, vid_type):
     if not thumb.startswith('http://'):
       thumb = BASE_URL + thumb
     date = Datetime.ParseDate(video.xpath('./div/i//text()')[0].split()[1])
-    oc.add(VideoClipObject(
-      url = vid_url, 
-      title = title, 
-      thumb = thumb,
-      originally_available_at=date
-      ))
+    # if the video ends with ?id, it is a playlist so only the first part will play, so need to change url to playlist url and send it to videopage function
+    # ALL SECTIONS BUT FULL EPISODE HAVE '?id=' ON THE END, BUT THEY ARE ALL ONE PART EXCEPT FOR ONE AREA
+    # ONLY VID_TYPE SHOWS(EXCEPT THOSE WITH TITLE THAT STARTS WITH SNEAK) ARE VIDEO PLAYLIST WITH MULTIPLE PARTS
+    if vid_type=='shows' and not title.startswith('Sneak'):
+        vid_id = vid_url.split('?id=')[1]
+        vid_url = PLAYLIST %vid_id
+        # send to videopage function
+        oc.add(DirectoryObject(key=Callback(VideoPage, title=title, url=vid_url), title=title, thumb=thumb))
+    else:
+      oc.add(VideoClipObject(
+        url = vid_url, 
+        title = title, 
+        thumb = thumb,
+        originally_available_at=date
+        ))
 
   if len(oc) < 1:
     Log ('still no value for objects')
@@ -616,6 +625,7 @@ def ProduceMarquee(title, url):
       oc.add(DirectoryObject(key=Callback(ShowVideos, title=title, section_id='', url=vid_url, season=season), title=title, thumb=thumb))
     elif URLTest(vid_url):
       # if the video ends with #id, it is a playlist so only the first part will play, so need to change url to playlist url and send it to videopage function
+      # VIDEO PLAYLIST FOUND HERE ARE IN THE FORMAT OF HAVING '#id=' ON THE END
       if '#id=' in vid_url:
         vid_id = vid_url.split('#id=')[1]
         vid_url = PLAYLIST %vid_id
