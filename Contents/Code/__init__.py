@@ -1,6 +1,6 @@
 # VIDEO PLAYLIST IN THE TABLE LIST ARE IN THE FORM OF '/video/play.jhtml?id=' AND IN THE MARQUEES ON THE END AS #id= 
 # VIDEO CAROUSELS THE SHOWS SECTION ARE VIDEO PLAYLIST AND OF TYPE '/video/play.jhtml?id=' EXCEPT SNEEK PEEKS
-# SEARCHES AND ALL THAT GO THROU VIDEO PAGE DO NOT HAVE PLAYLIST
+# ALL THAT GO THROUGH VIDEO PAGE DO NOT HAVE PLAYLIST
 TITLE = 'VH1'
 PREFIX = '/video/vh1'
 ART = 'art-default.jpg'
@@ -12,7 +12,6 @@ SHOWS = 'http://www.vh1.com/shows/'
 TOP_50 = 'http://www.vh1.com/shows/top_50_shows.jhtml'
 VH1_MENU = 'http://www.vh1.com/sitewide/navigation/menubar_new.jhtml'
 VH1_ALLMENU = 'http://www.vh1.com/shows/all_vh1_shows.jhtml'
-SEARCH_URL = 'http://www.vh1.com/search/video/'
 # Variables below uses the base url and either %20Full%20Episodes  or %20Bonus%20Clips but %s will not work with '-' in url so have to split into two
 POPULAR_AJAX_PART1 = '/global/music/modules/mostPopular/module.jhtml?category=Videos%20-%20TV%20Show%20Videos%20-%20'
 POPULAR_AJAX_PART2 = '&contentType=videos&howManyChartItems=25&fluxSort=numberOfViews:today:desc'
@@ -47,7 +46,8 @@ def MainMenu():
   oc.add(DirectoryObject(key=Callback(ShowMain, title='VH1 Shows'), title='VH1 Shows')) 
   oc.add(DirectoryObject(key=Callback(VideoMain, title='VH1 Videos'), title='VH1 Videos')) 
   #To get the InputDirectoryObject to produce a search input in Roku, prompt value must start with the word "search"
-  oc.add(InputDirectoryObject(key=Callback(SearchVideos, title='Search VH1 Videos'), title='Search VH1 Videos', summary="Click here to search videos", prompt="Search for the videos you would like to find"))
+  #oc.add(InputDirectoryObject(key=Callback(SearchVideos, title='Search VH1 Videos'), title='Search VH1 Videos', summary="Click here to search videos", prompt="Search for the videos you would like to find"))
+  oc.add(SearchDirectoryObject(identifier="com.plexapp.plugins.vh1", title=L("Search VH1 Videos"), prompt=L("Search for Videos")))
   return oc
 #####################################################################################
 # This is the submenu for all vh1 videos
@@ -56,7 +56,7 @@ def ShowMain(title):
   oc = ObjectContainer(title2=title)
   oc.add(DirectoryObject(key=Callback(ProduceShows, title='VH1 Shows', sort_type='shows'), title='VH1 Shows')) 
   oc.add(DirectoryObject(key=Callback(ProduceShows, title='VH1 Specials', sort_type='specials'), title='VH1 Specials')) 
-  oc.add(DirectoryObject(key=Callback(VH1AllShows, title='VH1 Top 50 Shows', url=TOP_50, ch=''), title='VH1 Top 50 Shows')) 
+  oc.add(DirectoryObject(key=Callback(VH1AllShows, title='VH1 Top 50 Shows', url=TOP_50), title='VH1 Top 50 Shows')) 
   oc.add(DirectoryObject(key=Callback(Alphabet, title='VH1 Shows A to Z'), title='VH1 Shows A to Z')) 
   return oc
 ####################################################################################################
@@ -73,7 +73,6 @@ def VideoMain(title):
   return oc
 ####################################################################################################
 # This handles most popular from the ajax 
-# ARE THERE AFTERSHOWS FOR VH1???
 @route(PREFIX + '/mostpopular')
 def MostPopular(title):
     oc = ObjectContainer(title2=title)
@@ -89,7 +88,8 @@ def ProduceShows(title, sort_type):
   oc = ObjectContainer(title2=title)
   data = HTML.ElementFromURL(VH1_MENU)
 
-  for video in data.xpath('//ul[@class="submenu"]/li/ul/li/a'):
+  #for video in data.xpath('//ul[@class="submenu"]/li/ul/li/a'):
+  for video in data.xpath('//ul[@id="shows-submenu"]/li/ul/li/a'):
     url = video.xpath('.//@href')[0]
     if not url.startswith('http://'):
       url = BASE_URL + url
@@ -97,7 +97,7 @@ def ProduceShows(title, sort_type):
     # THE GETTHUMB FUNCTION PRODUCES IMAGES BUT SLOW DOWN PULL SO IN THIS VERSION 
     # USED THE OPTION OF ADDING THEM AS CALLBACKS TO DIRECTORYOBJECTS PER MIKE'S SUGGESTION
     if sort_type=='shows':
-      if 'series.jhtml' in url and 'super_bowl' not in url:
+      if 'series.jhtml' in url and 'super_bowl' not in url and 'tlc_story' not in url:
       # Would prefer to use a content check for Other Seasons since some shows do not have /season in url but it slows down the pull
         if '/season_' in url:
           oc.add(DirectoryObject(key=Callback(ShowSeasons, title=title, url=url), title=title, thumb=Callback(GetThumb, url=url)))
@@ -110,8 +110,8 @@ def ProduceShows(title, sort_type):
         pass
 
     else:
-      if '/events/' in url or  'super_bowl' in url:
-        if 'do_something' in url:
+      if '/events/' in url or 'super_bowl' in url or 'tlc_story' in url:
+        if 'do_something' in url or 'you_oughta_know' in url:
           video_url = url + 'video_photos.jhtml'
         elif 'series.jhtml' in url:
           video_url = url.replace('series.jhtml', 'video.jhtml')
@@ -134,33 +134,33 @@ def ProduceShows(title, sort_type):
 def Alphabet(title):
     oc = ObjectContainer(title2=title)
     for ch in list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'):
-        oc.add(DirectoryObject(key=Callback(VH1AllShows, title=ch, url=VH1_ALLMENU + '?chars=' + ch, ch=ch), title=ch))
+        oc.add(DirectoryObject(key=Callback(VH1AllShows, title=ch, url=VH1_ALLMENU + '?chars=' + ch), title=ch))
     return oc
 #####################################################################################
 # This pulls from the VH1 archive All shows section and works for A-Z sorts of VH1 Shows
 # THERE ARE LISTINGS FOR AWARDS SHOWS THAT NO LONGER HAVE SITES. 2010 HIP HOP HONORS AND 17TH ANNUAL CRITIC CHOICE AWARDS HAVE SITES, BUT LINKS ARE INCORRECT
 @route(PREFIX + '/vh1allshows')
-def VH1AllShows(title, url, ch):
+def VH1AllShows(title, url):
   oc = ObjectContainer(title2=title)
   #THIS IS A UNIQUE DATA PULL
   data = HTML.ElementFromURL(url)
-  if ch:
-    xpath = '//div[@id="azshows"]/div/div/div[contains(@style,"float")]/div'
+  if '?chars=' in url:
+    xpath = '//div[@id="azshows_wrapper"]/div/div/a'
   else:
-    xpath = '//div[@id="azshows2"]/div/table/tr/td'
+    xpath = '//tr[contains(@class,"Color")]/td/a'
   for video in data.xpath('%s' %xpath):
-    url = video.xpath('./a//@href')[0]
+    url = video.xpath('.//@href')[0]
     if not url.startswith('http://'):
       url = BASE_URL + url
     if url in BAD_SHOW_LIST:
       continue
-    title = video.xpath('./a//text()')[0].strip()
+    title = video.xpath('.//text()')[0].strip()
     # THE GETTHUMB FUNCTION PRODUCES IMAGES BUT SLOW DOWN PULL SO IN THIS VERSION 
     # USED OPTION OF ADDING THEM AS CALLBACKS TO DIRECTORYOBJECTS PER MIKE'S SUGGESTION 
     thumb = R(ICON)
     # The all shows section put series.jhtml on the end of all of the shows even the specials
-    if 'awards' not in url and 'divas_' not in url and '/festivals/' not in url and '/critics_choice' not in url and 'hip_hop_honors' not in url:
-      # Here the shows are listed by individual seasons but still need to send to ShowCreateSeason if _season not in url. Specials here still have series.jhtml on them
+    if 'awards' not in url and 'divas_' not in url and 'tlc_story' not in url and 'you_oughta_know' not in url and '/festivals/' not in url and '/critics_choice' not in url and 'hip_hop_honors' not in url:
+      # Here the shows are listed by individual seasons. Specials here still have series.jhtml on them
       if '/season_' in url:
         season = url.split('/season_')[1]
         season = int(season.split('/')[0])
@@ -400,70 +400,6 @@ def ShowVideos(title, section_id, url, season):
     return ObjectContainer(header="Empty", message="There are no videos to list right now.")
   else:
     return oc
-#########################################################################################
-# This function is for searches
-@route(PREFIX + '/searchvideos')
-def SearchVideos(title, query='', page_url=''):
-  oc = ObjectContainer(title2=title)
-  if query:
-    local_url = SEARCH_URL + '?q=' + String.Quote(query, usePlus = False)  + '&page=1'
-  else:
-    local_url = SEARCH_URL + page_url
-  data = HTML.ElementFromURL(local_url)
-  for item in data.xpath('//ul/li[contains(@class,"mtvn-video ")]'):
-    link = item.xpath('./div/a//@href')[0]
-    if not link.startswith('http://'):
-      link = BASE_URL + link
-    image = item.xpath('./div/a/span/img//@src')[0]
-    if not image.startswith('http://'):
-      image = BASE_URL + image
-    try:
-      video_title = item.xpath('./div/a/text()')[2].strip()
-    except:
-      video_title = item.xpath('./div/div/a/text()')[0]
-    if not video_title:
-      try:
-        video_title = item.xpath('./div/a/span/span/text()')[0]
-        video_title2 = item.xpath('./div/a/span/em/text()')[0]
-        video_title = video_title + ' ' + video_title2
-      except:
-        video_title = ''
-    try:
-      date = item.xpath('./p/span/em//text()')[0]
-      if date.startswith('Music'):
-        date = item.xpath('./p/span/em//text()')[1]
-    except:
-      date = ''
-    if 'hrs ago' in date:
-      try:
-        date = Datetime.Now()
-      except:
-        date = ''
-    else:
-      date = Datetime.ParseDate(date)
-
-    oc.add(VideoClipObject(url=link, title=video_title, originally_available_at=date, thumb=Resource.ContentsOfURLWithFallback(url=image, fallback=ICON)))
-  # This goes through all the pages of a search
-  # After first page, the Prev and Next have the same page_url, so have to check for
-  try:
-    page_type = data.xpath('//a[contains(@class,"pagination")]//text()')
-    x = len(page_type)-1
-    if 'Next' in page_type[x]:
-      page_url = data.xpath('//a[contains(@class,"pagination")]//@href')[x]
-      oc.add(NextPageObject(
-        key = Callback(SearchVideos, title = title, page_url = page_url), 
-        title = L("Next Page ...")))
-    else:
-      pass
-  except:
-    pass
-
-  #oc.objects.sort(key = lambda obj: obj.index, reverse=True)
-
-  if len(oc)==0:
-    return ObjectContainer(header="Sorry!", message="No video available in this category.")
-  else:
-    return oc
 ####################################################################################################
 # This produces videos for most popular for vh1 and for specials
 # This function works with the ajax and global module pages
@@ -648,8 +584,6 @@ def ProduceMarquee(title, url):
     return oc
 ############################################################################################################################
 # This is to test if there is a Plex URL service for  given url.  
-# Seems to return some RSS feeds as not having a service when they do, so currently unused and needs more testing
-#       if URLTest(url) == "true":
 @route(PREFIX + '/urltest')
 def URLTest(url):
   url_good = ''
