@@ -19,7 +19,7 @@ POPULAR_AJAX_PART2 = '&contentType=videos&howManyChartItems=25&fluxSort=numberOf
 # BECAUSE THEY HAVE ENDED EVERY LINK WITH SERIES.JHTML INSTEAD OF CORRECT URL FOR A SPECIAL (/EVENT/) WE HAVE TO CHECK FOR THEM AND PULL THEM OUT
 SPECIAL_LIST = ["Do Something Awards 2013", "VH1 Divas 2012", "Critics' Choice Television Awards (2011)", "The Best Super Bowl Concert Ever",
                 "VH1 Super Bowl Blitz"]
-# THIS IS A LISTOF ANY SHOWS OR SPECIALS IN THE ALL SHOWS PAGE THAT GIVE AN ERROR
+# THIS IS A LIST OF ANY SHOWS OR SPECIALS IN THE ALL SHOWS PAGE THAT GIVE AN ERROR
 BAD_ARCHIVE_LIST = ["VH1 Classic Main Format", "VH1 Classic", "ANOTHER SHOW"]
 
 RE_SERIES_ID = Regex("var seriesID = '(\d+)';")
@@ -190,7 +190,7 @@ def Alphabet(title):
     return oc
 #####################################################################################
 # This pulls from the VH1 archive All shows section and works for A-Z sorts of VH1 Shows
-# THERE ARE LISTINGS FOR AWARDS SHOWS THAT NO LONGER HAVE SITES. 2010 HIP HOP HONORS AND 17TH ANNUAL CRITIC CHOICE AWARDS HAVE SITES, BUT LINKS ARE INCORRECT
+# THERE ARE LISTINGS FOR AWARDS SHOWS THAT NO LONGER HAVE SITES AND SOME OF THEIR LINKS ARE INCORRECT
 @route(PREFIX + '/vh1allshows')
 def VH1AllShows(title, url):
     oc = ObjectContainer(title2=title)
@@ -476,7 +476,6 @@ def BlogPlayer(title, url):
         url = video.xpath('./header/h3/a/@href')[0]
         # need to manipulate the url
         id_num = mgid.split('id=')[1]
-        Log('the value of mgid is %s' %mgid)
         if 'videolist' in mgid:
             new_url = 'http://www.vh1.com/video/playlist.jhtml?id=' + id_num
         else:
