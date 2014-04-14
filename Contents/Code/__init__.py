@@ -8,12 +8,9 @@ BASE_URL = 'http://www.vh1.com'
 VH1_ALLMENU = 'http://www.vh1.com/shows/all_vh1_shows.jhtml'
 SEARCH_URL = 'http://www.vh1.com/search/'
 SERIES_VIDEOS = 'http://www.vh1.com/global/music/modules/video/shows/?seriesID='
-PLAYLIST = 'http://www.mtv.com/global/music/videos/ajax/playlist.jhtml?feo_switch=true&channelId=1&id='
 # The two variables below uses the base url and either %20Full%20Episodes  or %20Bonus%20Clips but %s will not work with '-' in url so have to split into two
 POPULAR_AJAX_PART1 = '/global/music/modules/mostPopular/module.jhtml?category=Videos%20-%20TV%20Show%20Videos%20-%20'
 POPULAR_AJAX_PART2 = '&contentType=videos&howManyChartItems=25&fluxSort=numberOfViews:today:desc&displayPostedDate=true'
-MRSS_FEED = 'http://www.mtv.com/player/embed/AS3/rss/?uri=mgid:uma:videolist:vh1.com:%s'
-PARTS_URL = 'http://www.vh1.com/video/play.jhtml?id=%s#parts=%s'
 
 # THIS IS A LISTING FOR AWARDS SHOWS OR SPECIALS ON THE ALL SHOWS PAGE THAT WE WANT TO PRODUCE VIDEOS FOR BUT 
 # BECAUSE THEY HAVE ENDED EVERY LINK WITH SERIES.JHTML INSTEAD OF CORRECT URL FOR A SPECIAL (/EVENT/) WE HAVE TO CHECK FOR THEM AND PULL THEM OUT
@@ -29,8 +26,6 @@ RE_SERIES_ID = Regex("var seriesID = '(\d+)';")
 RE_SEASON  = Regex('(Season|Seas.) ?(\d{1,2})')
 RE_EPISODE  = Regex('(Episode|Ep.) ?(\d{1,3})')
 RE_VIDID = Regex('(\d{7})')
-RE_VIDID2 = Regex('(\d{6,7})')
-RE_PARTS  = Regex('Top (\d{1,2}) Moments')
 
 ####################################################################################################
 # Set up containers for all possible objects
@@ -175,9 +170,6 @@ def VH1AllShows(title, url):
                 #Need to pre-code "Philly 4th of July Jam"
                 if "Philly 4th Of July Jam" in title:
                     url = PLAYLIST + '1709553'
-                 # All other Critics' Choice Movie Awards are either 404 errors or go to a series page
-                #elif "Do Something Awards" in title and "2013" not in title:
-                    #continue
                 #Need to get the proper url for the videos for the rest since it puts series on the end and we need the video page
                 else:
                     url = SpecialFix(url)
@@ -322,74 +314,46 @@ def VideoPage(url, title, season=0, show_name=''):
         # Here we are building a url either with a part number or with building a playlist
         if not link.startswith('http:'):
             link = BASE_URL + link
-        # Pop up video(format is http://www.vh1.com/video/play.jhtml?id=) lists the parts in the metadata so we do not need to the extra call for them
+        # Pop up video(format is http://www.vh1.com/video/play.jhtml?id=) 
+        Log('the value of link is %s' %link)
         if 'Pop Up Video' in title:
             # clean up the title a little
             try: video_title = video_title.split(': ')[1].strip()
             except: pass
-            try:
-                parts = item.xpath('.//div[@class="vidCount"]//text()')[0].strip().split()[0]
-                # take the number of parts out of the title
-                video_title = video_title.split('videos')[1].strip()
-                new_url = '%s#parts=%s' %(link, parts)
-            except:
-                new_url = link
-        # This handles specials
-        elif '#id=' in link and PLAYLIST not in url:
+            new_url = link
+        # This handles playlists of video clips like specials
+        elif '#id=' in link:
             # We first check to see if the id_num has been processed so we do not have to do any uneccessary calls
             id_num = RE_VIDID.search(link).group(1)
             if id_num not in id_num_list:
                 id_num_list.append(id_num)
-                (new_url, video_title) = BuildUrl(link)
+                new_url = 'http://www.vh1.com/video/play.jhtml?id=' + id_num
             else:
                 continue
-        # This handles full episodes
-        elif 'playlist.jhtml' in link:
-            # Just define parts for a few smaller shows
-            if show_name in ['That Metal Show', 'Behind the Music Remastered']:
-                new_url =  link + '#parts=5'
-            new_url = link
-        # This handles video clips
-        elif '/video/play.jhtml?id=' in link:
-            # First check for parts in title via top moments
-            try:
-                vid_parts = RE_PARTS.search(link).group(1)
-                new_url = link + '#parts=' + vidparts
-            except:
-                try:
-                    # This checks for 7 digit mgid number
-                    id_num = RE_VIDID.search(link).group(1)
-                    new_url = PLAYLIST + id_num
-                # this is just in case any of the videos have a 6 digit number instead of 7
-                except:
-                    new_url = link
         else:
             new_url = link
             
         # Skip full episodes and videos with parts for Android Clients
-        if Client.Platform in ('Android') and ('playlist.jhtml' in new_url or '#parts=' in new_url):
+        if Client.Platform in ('Android') and 'playlist.jhtml' in new_url:
             continue
 
-        if PLAYLIST in new_url:
-            oc.add(DirectoryObject(key=Callback(VideoPage, title=video_title, url=new_url), title=video_title, thumb=image, summary=desc))
-        else:
-            if show:
-                # check for episode
-                try: episode = item.xpath('.//li[@class="list-ep"]//text()')[0]
-                except: episode = None
-                if episode and episode.isdigit()==True:
-                    season = int(episode[0])
-                    episode = int(episode)
-                # check for episode and season in title
-                else:
-                    try:  episode = int(RE_EPISODE.search(video_title).group(2))
-                    except: episode = 0
-                    if season==0:
-                        try: season = int(RE_SEASON.search(video_title).group(2))
-                        except: pass
-                oc.add(EpisodeObject(url=new_url, title=video_title, season=season, show=show, index=episode, summary=desc, originally_available_at=date, thumb=Resource.ContentsOfURLWithFallback(url=image)))
+        if show:
+            # check for episode
+            try: episode = item.xpath('.//li[@class="list-ep"]//text()')[0]
+            except: episode = None
+            if episode and episode.isdigit()==True:
+                season = int(episode[0])
+                episode = int(episode)
+            # check for episode and season in title
             else:
-                oc.add(VideoClipObject(url=new_url, title=video_title, summary=desc, originally_available_at=date, thumb=Resource.ContentsOfURLWithFallback(url=image)))
+                try:  episode = int(RE_EPISODE.search(video_title).group(2))
+                except: episode = 0
+                if season==0:
+                    try: season = int(RE_SEASON.search(video_title).group(2))
+                    except: pass
+            oc.add(EpisodeObject(url=new_url, title=video_title, season=season, show=show, index=episode, summary=desc, originally_available_at=date, thumb=Resource.ContentsOfURLWithFallback(url=image)))
+        else:
+            oc.add(VideoClipObject(url=new_url, title=video_title, summary=desc, originally_available_at=date, thumb=Resource.ContentsOfURLWithFallback(url=image)))
 
     if len(oc) < 1:
         Log ('no value for objects')
@@ -404,17 +368,10 @@ def VideoPage(url, title, season=0, show_name=''):
                 if not vid_url.startswith('http://'):
                     vid_url = BASE_URL + vid_url
                 title = video.xpath('./td[@class="r-title"]/a//text()')[0]
-                #For these old shows, it would be impossible to determine the number of parts so using default and sending clips to Video page as playlist
-                if '?id=' in vid_url:
-                    vid_id = RE_VIDID.search(vid_url).group(1)
-                    vid_url = PLAYLIST + vid_id
-                    # send to videopage function
-                    oc.add(DirectoryObject(key=Callback(VideoPage, title=title, url=vid_url), title=title))
-                else:
-                    try: episode = int(video.xpath('./td[@class="r-ep"]//text()')[0])
-                    except: episode = 0
-                    date = Datetime.ParseDate(video.xpath('./td[@class="r-date"]//text()')[0])
-                    oc.add(EpisodeObject(url = vid_url, season = season, index = episode, title = title, originally_available_at = date))
+                try: episode = int(video.xpath('./td[@class="r-ep"]//text()')[0])
+                except: episode = 0
+                date = Datetime.ParseDate(video.xpath('./td[@class="r-date"]//text()')[0])
+                oc.add(EpisodeObject(url = vid_url, season = season, index = episode, title = title, originally_available_at = date))
         except:
             pass
   
@@ -426,7 +383,6 @@ def VideoPage(url, title, season=0, show_name=''):
 #######################################################################################
 # This function produces videos from a blog like best week ever
 # SOMETIMES ONLY THE LATEST FULL EPISODE OFFERED ON THE BLOG WILL ACTUALLY PLAY
-# NEED TO ADD ANDROID CHECK HERE 
 @route(PREFIX + '/blogplayer')
 def BlogPlayer(title, url):
     oc = ObjectContainer(title2=title)
@@ -435,18 +391,13 @@ def BlogPlayer(title, url):
     for video in data.xpath('//article'):
         try: mgid = video.xpath('./section/div/@data-content-uri')[0]
         except: continue
-        # need to build a url that will work with the url service and check for blank videos since many older full episodes are empty
-        # if the mgid has videolist in it we send it to get the number of parts otherwise we just get the id number and make it a video clip
-        if 'mgid:uma:videolist:' in mgid:
-            if Client.Platform in ('Android'):
-                continue
-            else:
-                (new_url, alt_title) = BuildUrl(mgid)
-        else:
-            id_num = mgid.split('com:')[1]
-            new_url = 'http://www.vh1.com/video/play.jhtml?id=' + id_num
-        if not new_url:
+        if '/cp~vid' in mgid:
+            mgid = mgid.split('/cp~vid')[0]
+        # need to build a url that will work with the url service
+        if 'mgid:uma:videolist:' in mgid and Client.Platform in ('Android'):
             continue
+        id_num = mgid.split('com:')[1]
+        new_url = 'http://www.vh1.com/video/play.jhtml?id=' + id_num
         vid_title = video.xpath('./header/h3/a/@title')[0]
         date = video.xpath('.//span[@class="entry-date"]//text()')[0].split('|')[0]
         date = Datetime.ParseDate(date.strip())
@@ -496,38 +447,3 @@ def SpecialJSON(title, url):
             originally_available_at=date
         ))
     return oc
-#####################################################################################
-# This function finds the mgid number(id_num) and pulls the mrss feed to see how many parts it has 
-@route(PREFIX + '/partscheck', parts=int)
-def PartsCheck(url):
-    try:
-        id_num = RE_VIDID.search(url).group(1)
-        data = XML.ElementFromURL(MRSS_FEED %id_num, cacheTime = CACHE_1DAY)
-        item_list = data.xpath('//item')
-        # YOU COULD ALSO PICK UP THE ALTERNATE TITLE HERE
-        try: alt_title = data.xpath('//title')[0].text
-        except: alt_title = None
-        parts = len(item_list)
-    except:
-        id_num = RE_VIDID2.search(url).group(1)
-        parts=1
-        alt_title = ''
-
-    str_parts = str(parts)
-    #Log('the value of parts is %s and the value of id_num is %s' %(str_parts, id_num))
-    #Log('the value of alt_title is %s' %alt_title)
-    return (parts, id_num, alt_title)
-#####################################################################################
-# This function builds a new url to work with the parts variable in the URL service
-# If there is more than one part, it will creates a URL with a parts extension that can be used by the MediaObject in the URL service
-@route(PREFIX + '/buildurl', parts=int)
-def BuildUrl(url):
-    (parts, id_num, alt_title) = PartsCheck(url)
-    if parts > 1:
-        new_url = PARTS_URL %(id_num, parts)
-    elif parts == 1:
-        new_url = 'http://www.vh1.com/video/play.jhtml?id=' + id_num
-    else:
-        new_url = None
-
-    return (new_url, alt_title)
